@@ -3,7 +3,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: jivvon1/ros-noetic-cuda:v3
+    image: sparolab/kiss-imu:v1.0
     container_name: kiss-imu-ws
     privileged: true
     ipc: host

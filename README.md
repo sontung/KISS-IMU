@@ -38,7 +38,7 @@ during training.
 
 ### 🐳 Quick start with Docker
 
-The base image (`jivvon1/ros-noetic-cuda:v3`) already contains all
+The base image (`sparolab/kiss-imu:v1.0`) already contains all
 runtime deps (CUDA, PyTorch, pypose, kiss-icp, small_gicp, pygicp,
 scikit-learn, …). The compose file mounts the repo as the working
 directory automatically — you only need to point one line at your

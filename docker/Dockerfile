@@ -4,7 +4,7 @@
 #
 # When you (the user) host this image under your lab's account, replace
 # the FROM line below.
-FROM jivvon1/ros-noetic-cuda:v3
+FROM sparolab/kiss-imu:v1.0
 
 # QoL: avoid X11 MIT-SHM for matplotlib/cv2 windows
 ENV QT_X11_NO_MITSHM=1
