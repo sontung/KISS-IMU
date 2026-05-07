@@ -15,11 +15,11 @@
   <a href="https://scholar.google.com/citations?user=kiBTkqMAAAAJ&hl=ko" target="_blank">Geonmo Yang</a><sup></sup>,
   <a href="https://scholar.google.com/citations?user=4-5Fi9kAAAAJ&hl=ko" target="_blank">Juhui Lee</a><sup></sup>,
   <a href="https://scholar.google.com/citations?user=W5MOKWIAAAAJ&hl=ko" target="_blank">Younggun Cho</a><sup>†</sup>
-
+ 
 **[🤖 Spatial AI and Robotics Lab (SPARO)](https://sites.google.com/view/sparo/%ED%99%88?authuser=0&pli=1)**
 
   <p align="center"><img src="fig/main.gif" alt="animated" width="75%" /></p>
-
+ 
   ***\<Keep IMU Stable and Strong\>***
 
 </div>
@@ -158,7 +158,7 @@ If you find this work useful, please consider citing:
 
 ## 📜 License
 For academic usage, the code is released under the BSD 3.0 license. For any commercial purpose, please contact the authors.
-
+ 
 ## ✨ Contributors
 <a href="https://github.com/sparolab/KISS-IMU/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=sparolab/KISS-IMU&t=1" />
