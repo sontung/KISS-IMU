@@ -27,7 +27,7 @@
 ---
 
 ## 📰 News
-- 🏆 **[May 6, 2026]** KISS-IMU is selected as an **IEEE ICRA 2026 Award Finalist**!
+- 🏆 **[May 6, 2026]** KISS-IMU is selected as an **IEEE ICRA 2026 Award Finalist**! 🏆
 - 🎉 **[Jan 31, 2026]** KISS-IMU is **accepted to IEEE ICRA 2026**.
 
 ## 💡 What is KISS-IMU?
