@@ -20,6 +20,8 @@
 
   <p align="center"><img src="fig/main.gif" alt="animated" width="75%" /></p>
 
+  ***Keep IMU Stable and Strong***
+
 </div>
 
 ---
