@@ -160,22 +160,17 @@ If you find this work useful, please consider citing:
 For academic usage, the code is released under the BSD 3.0 license. For any commercial purpose, please contact the authors.
  
 ## ✨ Contributors
-<a href="https://github.com/jivvon1">
-  <img src="https://github.com/jivvon1.png" width="60px" /><br />
-  <sub><b>jivvon1</b></sub>
-</a>
-&nbsp;&nbsp;
-<a href="https://github.com/hogyun2">
-  <img src="https://github.com/hogyun2.png" width="60px" /><br />
-  <sub><b>hogyun2</b></sub>
-</a>
-&nbsp;&nbsp;
-<a href="https://github.com/yang7422">
-  <img src="https://github.com/yang7422.png" width="60px" /><br />
-  <sub><b>yang7422</b></sub>
-</a>
-&nbsp;&nbsp;
-<a href="https://github.com/LEEJUHUI6635">
-  <img src="https://github.com/LEEJUHUI6635.png" width="60px" /><br />
-  <sub><b>LEEJUHUI6635</b></sub>
-</a>
+<p align="left">
+  <a href="https://github.com/jivvon1">
+    <img src="https://github.com/jivvon1.png" width="60" style="border-radius:50%; margin-right:8px;" />
+  </a>
+  <a href="https://github.com/hogyun2">
+    <img src="https://github.com/hogyun2.png" width="60" style="border-radius:50%; margin-right:8px;" />
+  </a>
+  <a href="https://github.com/yang7422">
+    <img src="https://github.com/yang7422.png" width="60" style="border-radius:50%; margin-right:8px;" />
+  </a>
+  <a href="https://github.com/LEEJUHUI6635">
+    <img src="https://github.com/LEEJUHUI6635.png" width="60" style="border-radius:50%; margin-right:8px;" />
+  </a>
+</p>
