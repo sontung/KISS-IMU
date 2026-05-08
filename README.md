@@ -8,7 +8,7 @@
   <a href="https://www.youtube.com/watch?v=cjAFROi-jG0"><img src="https://badges.aleen42.com/src/youtube.svg" alt="YouTube" /></a>
   <br />
 
-<h3>🏆 [IEEE ICRA 2026 Award Finalist] 🏆</h3>
+<h3>🏆 [IEEE ICRA 2026 Award Finalist]</h3>
 
   <a href="https://scholar.google.com/citations?user=wL8VdUMAAAAJ&hl=ko" target="_blank">Jiwon Choi</a><sup></sup>,
   <a href="https://hogyun2.github.io" target="_blank">Hogyun Kim</a><sup></sup>,
