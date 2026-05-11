@@ -17,7 +17,7 @@
   <a href="https://scholar.google.com/citations?user=kiBTkqMAAAAJ&hl=ko" target="_blank">Juhui Lee</a>,
   <a href="https://scholar.google.com/citations?user=W5MOKWIAAAAJ&hl=ko" target="_blank">Younggun Cho</a><sup>†</sup>
 
-  **[🤖 Spatial AI and Robotics Lab (SPARO)](https://sites.google.com/view/sparo/%ED%99%88?authuser=0&pli=1)**
+  **[🤖 Spatial AI and Robotics Lab (SPARO)](https://sparolab.github.io/)**
 
   <p align="center"><img src="fig/main.gif" alt="animated" width="75%" /></p>
 
