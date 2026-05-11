@@ -13,7 +13,8 @@ DATA_TYPE=${DATA_TYPE:-diter_os}
 EVAL_SEQS=${EVAL_SEQS:-"Forest_new Lawn_lower_night Park_in_day"}
 DEVICE=${DEVICE:-cuda:0}
 WINDOW=${WINDOW:-200}
-RESULT_DIR=${RESULT_DIR:-eval_results}
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RESULT_DIR=${RESULT_DIR:-${REPO_ROOT}/eval_results}
 
 # choose ONE of the two:
 CKPT=${CKPT:-}

@@ -31,14 +31,14 @@ USE_VALIDATION=${USE_VALIDATION:-true}
 USE_SUBMAP=${USE_SUBMAP:-false}
 
 # ---- output layout ---------------------------------------------------------
-RESULT_BASE=${RESULT_BASE:-results}
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TRAIN_NAME="bs=${BATCH_SIZE}_lr=${LR}_rw=${ROT_W}_vw=${VEL_W}_tw=${POS_W}_crw=${COV_R_W}_cvw=${COV_V_W}_ctw=${COV_T_W}_rcs=${ROT_COV_S}_vcs=${VEL_COV_S}_pcs=${POS_COV_S}_K=${GMM_COMP_NUM}"
 
 train_seqs_arr=( $TRAIN_SEQS ); valid_seqs_arr=( $VALID_SEQS )
 train_seqs_str=$(IFS='_' ; echo "${train_seqs_arr[*]}")
 valid_seqs_str=$(IFS='_' ; echo "${valid_seqs_arr[*]}")
 
-RESULT_DIR="${RESULT_BASE}/${DATA_TYPE}/${LM_WEIGHT}/${TRAIN_NAME}/${LO_MODEL}/${train_seqs_str}_valid_${valid_seqs_str}/${TRAIN_RATIO}"
+RESULT_DIR="${REPO_ROOT}/results/${DATA_TYPE}/${LM_WEIGHT}/${TRAIN_NAME}/${LO_MODEL}/${train_seqs_str}_valid_${valid_seqs_str}/${TRAIN_RATIO}"
 mkdir -p "$RESULT_DIR"
 
 # ---- flag handling ---------------------------------------------------------
