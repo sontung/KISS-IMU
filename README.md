@@ -98,7 +98,7 @@ Hyperparameters live as env vars at the top of [`scripts/train.sh`](scripts/trai
 | `LO_MODEL`      | `kiss_icp` \| `fast_gicp` \| `small_gicp` |
 | `GMM_COMP_NUM`  | `0` = auto-pick K via BIC, otherwise fixed K |
 | `USE_GT`        | GT pose supervision (ablation only, no ICP/PGO) |
-| `USE_SUBMAP`    | Aggregate scans into a sub-map for ICP |
+| `USE_SUBMAP`    | Aggregate scans into a sub-map for `small_gicp` |
 | `TRAIN_RATIO`   | Fraction of training windows used |
 
 ### Ablations
