@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+
 import tqdm
 import numpy as np
 import torch
@@ -9,10 +11,12 @@ import pypose as pp
 
 import matplotlib
 
+from src.dataset import SeqDataset
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from dataset import SeqDataset, collate_fn
+from rosbag_dataset import RosbagSeqDataset, collate_fn
 
 from training.losses import get_losses, get_valid_losses
 from training.integrator import IMUIntegrator
@@ -369,7 +373,7 @@ def train(
                 )
             comp_ids_t = comp_ids_t.clamp_(0, K - 1)
             print(
-                f"\033[91m[WARN] Invalid comp_ids detected; clamped to range 0..{K-1}\033[0m"
+                f"\033[91m[WARN] Invalid comp_ids detected; clamped to range 0..{K - 1}\033[0m"
             )
         comp_ids_list = [int(x) for x in comp_ids_t.detach().cpu().tolist()]
 
@@ -656,7 +660,7 @@ def train(
         )
 
         print(
-            f"  * {data_seq} Epoch {epoch_i}: ICP={icp_count}, PGO={pgo_count} (ICP ratio: {icp_count/total_count:.3f})"
+            f"  * {data_seq} Epoch {epoch_i}: ICP={icp_count}, PGO={pgo_count} (ICP ratio: {icp_count / total_count:.3f})"
         )
 
     return total_train_loss / max_iterations, global_step
@@ -1279,8 +1283,9 @@ if __name__ == "__main__":
 
     train_packs = []
     for seq in args.train_seqs:
-        ds = SeqDataset(
-            data_root=args.data_root, data_seq=seq, data_type=args.data_type
+        ds = RosbagSeqDataset(
+            data_root=args.data_root, data_seq=seq, data_type=args.data_type,
+            data_dir=Path("/home/vr/work/datasets/VINUNI/first_run")
         )
         dl = Data.DataLoader(
             dataset=ds,
@@ -1294,8 +1299,9 @@ if __name__ == "__main__":
 
     valid_packs = []
     for seq in args.valid_seqs:
-        ds = SeqDataset(
-            data_root=args.data_root, data_seq=seq, data_type=args.data_type
+        ds = RosbagSeqDataset(
+            data_root=args.data_root, data_seq=seq, data_type=args.data_type,
+            data_dir=Path("/home/vr/work/datasets/VINUNI/second_run")
         )
         dl = Data.DataLoader(
             dataset=ds,
@@ -1387,7 +1393,7 @@ if __name__ == "__main__":
     epoch_train_loss = 0
     epoch_valid_loss = 0
     for epoch_i in range(1, args.epoch + 1):
-        print(f"====== Epoch {epoch_i}/{args.epoch+1} ======")
+        print(f"====== Epoch {epoch_i}/{args.epoch + 1} ======")
 
         for train_seq, train_dataset, train_loader in train_packs:
             print(f"  * Training on sequence: {train_seq} *   ")

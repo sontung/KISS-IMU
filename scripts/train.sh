@@ -13,10 +13,10 @@
 set -euo pipefail
 
 # ---- dataset selection -----------------------------------------------------
-DATA_DIR=${DATA_DIR:-/storage1/Datasets/kiss_imu_datasets/DiTer_os}
+DATA_DIR=${DATA_DIR:-/home/vr/work/datasets/VINUNI}
 DATA_TYPE=${DATA_TYPE:-diter_os}                   # mulran|yeoncheon|kitti|diter++|diter_os|...
-TRAIN_SEQS=${TRAIN_SEQS:-"Forest_new"}
-VALID_SEQS=${VALID_SEQS:-"Forest_new"}
+TRAIN_SEQS=${TRAIN_SEQS:-"first_run/MyCustomData/Bag_Sequence_01"}
+VALID_SEQS=${VALID_SEQS:-"second_run/MyCustomData/Bag_Sequence_01"}
 LO_MODEL=${LO_MODEL:-kiss_icp}                     # kiss_icp|fast_gicp|small_gicp
 
 # ---- training hyper-params -------------------------------------------------
@@ -68,6 +68,7 @@ mkdir -p "$RESULT_DIR"
 
 # ---- run -------------------------------------------------------------------
 cd "$(dirname "$0")/../src"
+set -x # <--- TURNS ON: Prints the full python command with all arguments expanded
 python3 train.py \
     --result-dir "${RESULT_DIR}" \
     --data-type ${DATA_TYPE} \

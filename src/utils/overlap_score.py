@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation
 
-import pygicp
+# import pygicp
 
 
 def calc_symmetric_overlap(cloud1, cloud2, dis_threshold=0.3):

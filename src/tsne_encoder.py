@@ -26,7 +26,8 @@ import torch
 from torch.utils.data import DataLoader
 
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from sklearn.manifold import TSNE
@@ -39,46 +40,75 @@ from models.gmm import GmmModule
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--data-root', type=str, required=True)
-    p.add_argument('--data-type', type=str, required=True)
-    p.add_argument('--ckpt',      type=str, required=True,
-                   help='path to best_model.ckpt')
-    p.add_argument('--gmm',       type=str, default=None,
-                   help='path to gmm.joblib (defaults to <ckpt-dir>/gmm.joblib)')
+    p.add_argument("--data-root", type=str, required=True)
+    p.add_argument("--data-type", type=str, required=True)
+    p.add_argument("--ckpt", type=str, required=True, help="path to best_model.ckpt")
+    p.add_argument(
+        "--gmm",
+        type=str,
+        default=None,
+        help="path to gmm.joblib (defaults to <ckpt-dir>/gmm.joblib)",
+    )
 
-    p.add_argument('--train-seqs', nargs='+', type=str, required=True,
-                   help='sequences whose features go into the "train" plot')
-    p.add_argument('--eval-seqs',  nargs='+', type=str, required=True,
-                   help='sequences whose features go into the "eval" plot')
+    p.add_argument(
+        "--train-seqs",
+        nargs="+",
+        type=str,
+        required=True,
+        help='sequences whose features go into the "train" plot',
+    )
+    p.add_argument(
+        "--eval-seqs",
+        nargs="+",
+        type=str,
+        required=True,
+        help='sequences whose features go into the "eval" plot',
+    )
 
-    p.add_argument('--out-dir',   type=str, required=True)
-    p.add_argument('--device',    type=str, default='cuda:0')
-    p.add_argument('--batch-size', type=int, default=16)
-    p.add_argument('--num-workers', type=int, default=2)
+    p.add_argument("--out-dir", type=str, required=True)
+    p.add_argument("--device", type=str, default="cuda:0")
+    p.add_argument("--batch-size", type=int, default=16)
+    p.add_argument("--num-workers", type=int, default=2)
 
     # t-SNE knobs — defaults are fine for a few-thousand-window run.
-    p.add_argument('--perplexity', type=float, default=30.0)
-    p.add_argument('--max-windows', type=int, default=5000,
-                   help='cap on total points in the t-SNE plot (used to '
-                        'derive a per-component cap when --per-comp is 0)')
-    p.add_argument('--per-comp', type=int, default=0,
-                   help='points per component in the stratified sample. '
-                        '0 = auto (use min(component counts, max-windows / '
-                        'K_eligible)). Set explicitly to force the same '
-                        'count across components — clamped down per '
-                        'component if a component has fewer points')
-    p.add_argument('--min-per-comp', type=int, default=10,
-                   help='components with fewer than this many windows in the '
-                        'split are dropped from stratified sampling — they '
-                        'have too few samples to form a meaningful cluster')
-    p.add_argument('--pair-mode', type=str, default='all',
-                   choices=['all', 'farthest'],
-                   help='"all" plots every populated component. "farthest" '
-                        'picks the two components whose GMM means are most '
-                        'separated (Mahalanobis on the GMM\'s own scale) — '
-                        'useful as a focused "does the encoder separate the '
-                        'most-different motion regimes?" sanity check')
-    p.add_argument('--seed', type=int, default=0)
+    p.add_argument("--perplexity", type=float, default=30.0)
+    p.add_argument(
+        "--max-windows",
+        type=int,
+        default=5000,
+        help="cap on total points in the t-SNE plot (used to "
+        "derive a per-component cap when --per-comp is 0)",
+    )
+    p.add_argument(
+        "--per-comp",
+        type=int,
+        default=0,
+        help="points per component in the stratified sample. "
+        "0 = auto (use min(component counts, max-windows / "
+        "K_eligible)). Set explicitly to force the same "
+        "count across components — clamped down per "
+        "component if a component has fewer points",
+    )
+    p.add_argument(
+        "--min-per-comp",
+        type=int,
+        default=10,
+        help="components with fewer than this many windows in the "
+        "split are dropped from stratified sampling — they "
+        "have too few samples to form a meaningful cluster",
+    )
+    p.add_argument(
+        "--pair-mode",
+        type=str,
+        default="all",
+        choices=["all", "farthest"],
+        help='"all" plots every populated component. "farthest" '
+        "picks the two components whose GMM means are most "
+        "separated (Mahalanobis on the GMM's own scale) — "
+        'useful as a focused "does the encoder separate the '
+        'most-different motion regimes?" sanity check',
+    )
+    p.add_argument("--seed", type=int, default=0)
     return p.parse_args()
 
 
@@ -91,8 +121,8 @@ def farthest_pair(gmm: GmmModule) -> tuple[int, int]:
     by the inverse covariance (squared Mahalanobis) so anisotropic clusters
     don't artificially inflate distance along their elongated axis.
     """
-    M = gmm.gmm.means_                              # (K, 2)
-    covs = gmm.gmm.covariances_                     # (K, 2, 2) for "full"
+    M = gmm.gmm.means_  # (K, 2)
+    covs = gmm.gmm.covariances_  # (K, 2, 2) for "full"
     K = M.shape[0]
     best = (0.0, 0, 1)
     for i in range(K):
@@ -110,10 +140,9 @@ def farthest_pair(gmm: GmmModule) -> tuple[int, int]:
 
 
 @torch.no_grad()
-def collect_features(network: IMUNet,
-                     gmm: GmmModule,
-                     seqs,
-                     args) -> tuple[np.ndarray, np.ndarray]:
+def collect_features(
+    network: IMUNet, gmm: GmmModule, seqs, args
+) -> tuple[np.ndarray, np.ndarray]:
     """Iterate the given sequences; return (features, comp_ids).
 
     The encoder downsamples each window of length L into D feature vectors
@@ -129,27 +158,36 @@ def collect_features(network: IMUNet,
     gravity_np = None
 
     for seq in seqs:
-        ds = SeqDataset(data_root=args.data_root, data_seq=seq, data_type=args.data_type)
-        dl = DataLoader(dataset=ds, batch_size=args.batch_size,
-                        num_workers=args.num_workers, shuffle=False,
-                        drop_last=False, collate_fn=collate_fn)
+        ds = SeqDataset(
+            data_root=args.data_root, data_seq=seq, data_type=args.data_type
+        )
+        dl = DataLoader(
+            dataset=ds,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+            drop_last=False,
+            collate_fn=collate_fn,
+        )
 
-        g = getattr(ds, "gravity", np.array([0., 0., 9.81], dtype=np.float32))
-        gravity_np = g.cpu().numpy() if torch.is_tensor(g) else np.asarray(g, dtype=np.float64)
+        g = getattr(ds, "gravity", np.array([0.0, 0.0, 9.81], dtype=np.float32))
+        gravity_np = (
+            g.cpu().numpy() if torch.is_tensor(g) else np.asarray(g, dtype=np.float64)
+        )
 
         for sample in dl:
-            accels = sample['accels'].to(args.device).float()
-            gyros  = sample['gyros'].to(args.device).float()
-            valid_length = sample['valid_length']
+            accels = sample["accels"].to(args.device).float()
+            gyros = sample["gyros"].to(args.device).float()
+            valid_length = sample["valid_length"]
 
-            x = torch.cat([accels, gyros], dim=-1)        # (B, T, 6)
-            feat = network.encoder(x, valid_length)       # (B, D, 128)
-            feat_np = feat.detach().cpu().numpy()         # (B, D, 128)
+            x = torch.cat([accels, gyros], dim=-1)  # (B, T, 6)
+            feat = network.encoder(x, valid_length)  # (B, D, 128)
+            feat_np = feat.detach().cpu().numpy()  # (B, D, 128)
             B, D, _ = feat_np.shape
 
-            imu_ts_b = sample['imu_ts']                   # (B, T)
-            accels_b = sample['accels']                   # (B, T, 3)
-            gyros_b  = sample['gyros']                    # (B, T, 3)
+            imu_ts_b = sample["imu_ts"]  # (B, T)
+            accels_b = sample["accels"]  # (B, T, 3)
+            gyros_b = sample["gyros"]  # (B, T, 3)
             for b in range(B):
                 L = int(valid_length[b])
                 if L < 2:
@@ -161,11 +199,11 @@ def collect_features(network: IMUNet,
                     gyros_b[b, :L].cpu().numpy(),
                     gravity_np,
                 )
-                X = np.stack([lin_sp, ang_sp], axis=1)    # (L, 2)
-                labels = gmm.predict(X)                   # (L,)
+                X = np.stack([lin_sp, ang_sp], axis=1)  # (L, 2)
+                labels = gmm.predict(X)  # (L,)
 
                 base = L // D
-                rem  = L % D
+                rem = L % D
                 start = 0
                 for d in range(D):
                     end = start + base + (1 if d < rem else 0)
@@ -176,7 +214,9 @@ def collect_features(network: IMUNet,
                     if chunk.size == 0:
                         start = end
                         continue
-                    cid = int(np.bincount(chunk, minlength=gmm.gmm.n_components).argmax())
+                    cid = int(
+                        np.bincount(chunk, minlength=gmm.gmm.n_components).argmax()
+                    )
                     feats_all.append(feat_np[b, d])
                     comps_all.append(cid)
                     start = end
@@ -186,8 +226,14 @@ def collect_features(network: IMUNet,
     return feats, comps
 
 
-def run_tsne(feats: np.ndarray, comps: np.ndarray, n_components: int,
-             title: str, out_path: Path, args) -> None:
+def run_tsne(
+    feats: np.ndarray,
+    comps: np.ndarray,
+    n_components: int,
+    title: str,
+    out_path: Path,
+    args,
+) -> None:
     if len(feats) == 0:
         print(f"[tsne_encoder] no features for {title} — skipping plot")
         return
@@ -201,15 +247,19 @@ def run_tsne(feats: np.ndarray, comps: np.ndarray, n_components: int,
         return
 
     eligible = [k for k in populated if counts[k] >= args.min_per_comp]
-    dropped  = [k for k in populated if counts[k] <  args.min_per_comp]
+    dropped = [k for k in populated if counts[k] < args.min_per_comp]
     if dropped:
-        print(f"[tsne_encoder] {title}: dropping rare components "
-              f"{ {k: counts[k] for k in dropped} } "
-              f"(< --min-per-comp={args.min_per_comp})")
+        print(
+            f"[tsne_encoder] {title}: dropping rare components "
+            f"{ {k: counts[k] for k in dropped} } "
+            f"(< --min-per-comp={args.min_per_comp})"
+        )
     if len(eligible) < 2:
-        print(f"[tsne_encoder] {title}: only {len(eligible)} component(s) "
-              f"have ≥{args.min_per_comp} samples — skipping stratified "
-              f"sampling and falling back to all populated components")
+        print(
+            f"[tsne_encoder] {title}: only {len(eligible)} component(s) "
+            f"have ≥{args.min_per_comp} samples — skipping stratified "
+            f"sampling and falling back to all populated components"
+        )
         eligible = populated
 
     if args.per_comp > 0:
@@ -232,40 +282,57 @@ def run_tsne(feats: np.ndarray, comps: np.ndarray, n_components: int,
         per_comp_actual[k] = n_take
     picked_idx = np.concatenate(picked_idx)
     feats, comps = feats[picked_idx], comps[picked_idx]
-    print(f"[tsne_encoder] {title}: stratified ({mode}, target="
-          f"{per_comp_target}/component) × {len(eligible)} comps = "
-          f"{len(feats)} points (taken/source: "
-          f"{ {k: f'{per_comp_actual[k]}/{counts[k]}' for k in eligible} })")
+    print(
+        f"[tsne_encoder] {title}: stratified ({mode}, target="
+        f"{per_comp_target}/component) × {len(eligible)} comps = "
+        f"{len(feats)} points (taken/source: "
+        f"{ {k: f'{per_comp_actual[k]}/{counts[k]}' for k in eligible} })"
+    )
 
     if len(feats) < 5:
-        print(f"[tsne_encoder] {title}: only {len(feats)} samples — too few "
-              f"for t-SNE, skipping")
+        print(
+            f"[tsne_encoder] {title}: only {len(feats)} samples — too few "
+            f"for t-SNE, skipping"
+        )
         return
 
     perplexity = float(min(args.perplexity, max(2.0, (len(feats) - 1) / 3.0)))
     if perplexity >= len(feats):
         perplexity = max(2.0, len(feats) - 1.0)
-    print(f"[tsne_encoder] {title}: running t-SNE on {feats.shape} features "
-          f"(perplexity={perplexity:.1f})")
-    emb = TSNE(n_components=2, perplexity=perplexity,
-               random_state=args.seed, init='pca',
-               learning_rate='auto').fit_transform(feats)
+    print(
+        f"[tsne_encoder] {title}: running t-SNE on {feats.shape} features "
+        f"(perplexity={perplexity:.1f})"
+    )
+    emb = TSNE(
+        n_components=2,
+        perplexity=perplexity,
+        random_state=args.seed,
+        init="pca",
+        learning_rate="auto",
+    ).fit_transform(feats)
 
     fig, ax = plt.subplots(figsize=(8, 7))
-    cmap = plt.get_cmap('tab10', max(n_components, 1))
+    cmap = plt.get_cmap("tab10", max(n_components, 1))
     for k in range(n_components):
         mask = comps == k
         n_k = int(mask.sum())
         if n_k == 0:
             ax.scatter([], [], s=8, color=cmap(k), label=f"comp {k} (n=0)")
             continue
-        ax.scatter(emb[mask, 0], emb[mask, 1], s=8, alpha=0.6,
-                   color=cmap(k), label=f"comp {k} (n={n_k})")
+        ax.scatter(
+            emb[mask, 0],
+            emb[mask, 1],
+            s=8,
+            alpha=0.6,
+            color=cmap(k),
+            label=f"comp {k} (n={n_k})",
+        )
     ax.set_title(f"{title} — encoder features by GMM component (K={n_components})")
-    ax.set_xlabel("t-SNE 1"); ax.set_ylabel("t-SNE 2")
-    ax.legend(loc='best', fontsize=9, markerscale=2)
+    ax.set_xlabel("t-SNE 1")
+    ax.set_ylabel("t-SNE 2")
+    ax.legend(loc="best", fontsize=9, markerscale=2)
     plt.tight_layout()
-    plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"[tsne_encoder] {title}: saved → {out_path}")
 
@@ -282,8 +349,11 @@ def main():
         return 1
     if not gmm_path.exists():
         print(f"[tsne_encoder] GMM not found: {gmm_path}", file=sys.stderr)
-        print("  Train with the updated train.py (it now writes gmm.joblib "
-              "next to the run), or pass --gmm explicitly.", file=sys.stderr)
+        print(
+            "  Train with the updated train.py (it now writes gmm.joblib "
+            "next to the run), or pass --gmm explicitly.",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"[tsne_encoder] ckpt: {ckpt_path}")
@@ -291,7 +361,7 @@ def main():
 
     network = IMUNet(prop_cov=True, device=args.device).to(args.device)
     ckpt = torch.load(ckpt_path, map_location=args.device)
-    network.load_state_dict(ckpt['network'] if 'network' in ckpt else ckpt)
+    network.load_state_dict(ckpt["network"] if "network" in ckpt else ckpt)
     network.eval()
 
     # `train_packs` argument is required by __init__ but not used by load().
@@ -300,11 +370,13 @@ def main():
     print(f"[tsne_encoder] GMM has K={K} components")
 
     keep_set = None
-    if args.pair_mode == 'farthest':
+    if args.pair_mode == "farthest":
         a, b = farthest_pair(gmm)
         keep_set = {a, b}
-        print(f"[tsne_encoder] pair-mode=farthest: keeping components {a},{b} "
-              f"(GMM means: {gmm.gmm.means_[a]} vs {gmm.gmm.means_[b]})")
+        print(
+            f"[tsne_encoder] pair-mode=farthest: keeping components {a},{b} "
+            f"(GMM means: {gmm.gmm.means_[a]} vs {gmm.gmm.means_[b]})"
+        )
 
     for split_name, seqs in [("train", args.train_seqs), ("eval", args.eval_seqs)]:
         feats, comps = collect_features(network, gmm, seqs, args)
