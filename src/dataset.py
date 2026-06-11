@@ -134,9 +134,7 @@ class SeqDataset(Dataset):
         self.imu_ts = self.imu_data[:, 0]  # First column (N,)
         self.accels = self.imu_data[:, 1:4]  # Next 3 columns (N, 3)
         self.gyros = self.imu_data[:, 4:7]  # Last 3 columns (N, 3)
-        self.gravity = np.array(
-            [0.0, 0.0, 9.80665]
-        )  # Standard magnitude constant (or your specific calibration vector)
+        self.gravity = None
 
         # 3. Read Ground Truth Trajectory Poses
         pose_file = os.path.join(self.seq_path, "gt_pose.csv")

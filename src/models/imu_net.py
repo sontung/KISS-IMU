@@ -69,10 +69,10 @@ class IMUNet(nn.Module):
         x, _ = self.gru1(x)
         x, _ = self.gru2(x)
         return x
-    
+
     def cov_decoder(self, x):
-        acc_cov = torch.exp(self.acccov_decoder(x) - 5.)
-        gyr_cov = torch.exp(self.gyrcov_decoder(x) - 5.)
+        acc_cov = torch.exp(torch.clamp(self.acccov_decoder(x) - 5., min=-10., max=5.))
+        gyr_cov = torch.exp(torch.clamp(self.gyrcov_decoder(x) - 5., min=-10., max=5.))
         return acc_cov, gyr_cov
     
     def noise_decoder(self, x):

@@ -11,7 +11,7 @@ import pypose as pp
 
 import matplotlib
 
-from src.dataset import SeqDataset
+from dataset import SeqDataset
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -212,6 +212,9 @@ def train(
         imu_dvels = imu_dstates["vel"].to(args.device)
         imu_covs = imu_states["cov"].to(args.device)
         imu_dcovs = imu_dstates["cov"].detach().to(args.device)
+
+        # if torch.isnan(imu_covs).any() or torch.isinf(imu_covs).any():
+        #     print()
 
         imu_dts = (
             torch.stack([d.sum() for d in corr_data["dts"]])
@@ -1228,10 +1231,12 @@ def create_gmm_data_packs(train_packs, train_ratio):
         total_samples = len(dataset)
         limited_samples = int(total_samples * train_ratio)
 
-        limited_dataset = SeqDataset(
+        limited_dataset = RosbagSeqDataset(
             data_root=dataset.data_root,
             data_seq=dataset.data_seq,
+            data_dir=dataset.data_dir,
             data_type=dataset.data_type,
+            start=dataset.start, end=dataset.end,
         )
 
         limited_dataset.imu_ts = dataset.imu_ts[:limited_samples]
@@ -1285,7 +1290,9 @@ if __name__ == "__main__":
     for seq in args.train_seqs:
         ds = RosbagSeqDataset(
             data_root=args.data_root, data_seq=seq, data_type=args.data_type,
-            data_dir=Path("/home/vr/work/datasets/VINUNI/first_run")
+            data_dir=Path("/home/vr/work/datasets/VINUNI/first_run"),
+            gt_pose_path="/home/vr/work/kiss-icp/results/2026-06-08_14-51-30/first_run_poses.npy",
+            start=1461, end=10127,
         )
         dl = Data.DataLoader(
             dataset=ds,
@@ -1301,7 +1308,9 @@ if __name__ == "__main__":
     for seq in args.valid_seqs:
         ds = RosbagSeqDataset(
             data_root=args.data_root, data_seq=seq, data_type=args.data_type,
-            data_dir=Path("/home/vr/work/datasets/VINUNI/second_run")
+            data_dir=Path("/home/vr/work/datasets/VINUNI/second_run"),
+            gt_pose_path="/home/vr/work/kiss-icp/results/2026-06-08_15-01-07/second_run_poses.npy",
+            start=571, end=8946,
         )
         dl = Data.DataLoader(
             dataset=ds,

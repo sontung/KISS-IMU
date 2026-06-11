@@ -8,6 +8,8 @@ import torch
 from torch.utils.data import Dataset
 import pypose as pp
 import natsort
+from tqdm import tqdm
+from scipy.spatial.transform import Rotation as R
 
 
 def collate_fn(batch):
@@ -48,7 +50,7 @@ def collate_fn(batch):
         pad_imu_len = max_imu_len - curr_imu_len
 
         # Calculate dt pad requirement using the same universal max_imu_len anchor
-        pad_dts_len = max_imu_len - len(item["dts"])
+        pad_dts_len = max_imu_len - len(item["imu_dts"])
 
         # Pad IMU Timestamps [N] -> [Max_N]
         padded_ts = torch.nn.functional.pad(
@@ -71,7 +73,7 @@ def collate_fn(batch):
         # Pad Incremental Delta-T spans [N] -> [Max_N]
         # Crucial fix: Default padding value changed to 0.0 or typical dt offset (e.g., 0.01 for 100Hz)
         padded_dts = torch.nn.functional.pad(
-            item["dts"], (0, pad_dts_len), mode="constant", value=0.01
+            item["imu_dts"], (0, pad_dts_len), mode="constant", value=0.01
         )
         collated_imu_dts.append(padded_dts)
 
@@ -98,8 +100,37 @@ def collate_fn(batch):
     return output_batch
 
 
+def matrix_4x4_to_vector_7d(T):
+    """
+    Converts a 4x4 homogeneous transformation matrix into a 7D vector.
+
+    Format of output: [tx, ty, tz, qx, qy, qz, qw]
+    - Translation: tx, ty, tz
+    - Quaternion (SciPy / ROS convention): qx, qy, qz, qw
+    """
+    # Ensure input is a numpy array
+    T = np.array(T)
+
+    # 1. Extract the 3D translation vector (top right 3x1)
+    translation = T[0:3, 3]
+
+    # 2. Extract the 3D rotation matrix (top left 3x3)
+    rotation_matrix = T[0:3, 0:3]
+
+    # 3. Convert rotation matrix to quaternion
+    # SciPy natively outputs in (x, y, z, w) format
+    quaternion = R.from_matrix(rotation_matrix).as_quat()
+
+    # 4. Concatenate translation and quaternion into a 7D vector
+    vector_7d = np.concatenate([translation, quaternion])
+
+    return torch.from_numpy(vector_7d)
+
+
 class RosbagSeqDataset(Dataset):
-    def __init__(self, data_root, data_seq, data_dir: Path, topic=None, data_type="diter_os", window_size=5):
+    def __init__(self, data_root, data_seq, start, end,
+                 data_dir: Path, gt_pose_path=None,
+                 topic=None, data_type="diter_os", window_size=5):
         """
         Args:
             data_root (str): Path to the dataset root folder.
@@ -148,6 +179,7 @@ class RosbagSeqDataset(Dataset):
         self.bag.open()
         self.topic = self.check_topic(topic)
         self.n_scans = self.bag.topics[self.topic].msgcount
+        self.data_dir = data_dir
 
         # Build connections mapping
         self.connections = [x for x in self.bag.connections if x.topic == self.topic]
@@ -156,13 +188,15 @@ class RosbagSeqDataset(Dataset):
         print(f"Indexing rosbag for topic {self.topic}... This may take a moment.")
         self.msg_references = []
         self.lidar_timestamps = []
+        self.start = start
+        self.end = end
 
         # Scan through the message framework to build an absolute index index map
         for connection, timestamp, rawdata in self.bag.messages(connections=self.connections):
             self.msg_references.append((connection, rawdata))
             self.lidar_timestamps.append(self.to_sec(timestamp))
 
-        self.lidar_timestamps = np.array(self.lidar_timestamps, dtype=np.float64)
+        self.lidar_timestamps = np.array(self.lidar_timestamps, dtype=np.float64)[start:end]
         print(f"Successfully indexed {len(self.msg_references)} point cloud frames.")
 
         # =========================================================================
@@ -175,10 +209,12 @@ class RosbagSeqDataset(Dataset):
         self.imu_ts = self.imu_data[:, 0]
         self.accels = self.imu_data[:, 1:4]
         self.gyros = self.imu_data[:, 4:7]
-        self.gravity = torch.tensor([0.0, 0.0, 9.80665])
+        self.gravity = torch.tensor([0.0, 0.0, -9.80665])
 
         pose_file = os.path.join(self.seq_path.parent if self.seq_path.is_file() else self.seq_path, "gt_pose.csv")
         self.gt_poses = pd.read_csv(pose_file, header=None).values
+        if gt_pose_path is not None:
+            self.gt_poses = torch.from_numpy(np.load(gt_pose_path))[start:end]
 
         self.init = {
             "pos": torch.zeros(3),
@@ -211,13 +247,11 @@ class RosbagSeqDataset(Dataset):
         return torch.from_numpy(np.hstack([points_np, ts[:, None]]))
 
     def __len__(self):
-        if len(self.msg_references) < self.window_size:
-            return 0
-        return len(self.msg_references) - self.window_size
+        return len(self.lidar_timestamps)-1
 
     def __getitem__(self, idx):
         start_idx = idx
-        end_idx = idx + self.window_size
+        end_idx = idx + 1
 
         # Retrieve absolute timestamps out of our cached rosbag timing arrays
         t_start = self.lidar_timestamps[start_idx]
@@ -225,31 +259,36 @@ class RosbagSeqDataset(Dataset):
 
         # Extract slices of IMU data landing natively between t_start and t_end
         imu_mask = (self.imu_data[:, 0] >= t_start) & (self.imu_data[:, 0] <= t_end)
+        imu_indices = np.arange(self.imu_data.shape[0])[imu_mask]
+        imu_start_idx = imu_indices[0]
+        imu_end_idx = imu_indices[-1]
+        assert imu_start_idx < imu_end_idx
         window_imu = self.imu_data[imu_mask]
 
         if len(window_imu) == 0:
             window_imu = np.zeros((10, 7))
             window_imu[:, 0] = np.linspace(t_start, t_end, 10)
+            tqdm.write(f"NO imu data found in {t_start} to {t_end}")
+            return {}
 
         imu_ts = torch.from_numpy(window_imu[:, 0].astype(np.float32))
         accels = torch.from_numpy(window_imu[:, 1:4].astype(np.float32))
         gyros = torch.from_numpy(window_imu[:, 4:7].astype(np.float32))
 
-        dts = imu_ts[1:] - imu_ts[:-1]
-        dt_segment = self.imu_dts[start_idx:end_idx]
-        if len(dts) == 0:
-            dts = torch.tensor([0.01], dtype=torch.float32)
+        dt_segment = self.imu_dts[imu_start_idx:imu_end_idx]
 
-        gt_pose0 = torch.from_numpy(self.gt_poses[start_idx].astype(np.float32))
-        gt_pose1 = torch.from_numpy(self.gt_poses[start_idx:end_idx].astype(np.float32))
+        gt_pose0 = self.gt_poses[start_idx]
+        gt_pose1 = self.gt_poses[end_idx]
 
         dt_window = t_end - t_start
-        dp_window = self.gt_poses[end_idx, :3] - self.gt_poses[start_idx, :3]
-        gt_velocity = torch.from_numpy((dp_window / (dt_window + 1e-8)).astype(np.float32))
+        dp_window = gt_pose1[:3, 3]-gt_pose0[:3, 3]
+        gt_velocity = (dp_window / (dt_window + 1e-8))
+        gt_pose0 = matrix_4x4_to_vector_7d(gt_pose0)
+        gt_pose1 = matrix_4x4_to_vector_7d(gt_pose1)
 
         # INTEGRATED LOADING: Fetch point cloud matrices directly via index signatures
         scan0 = self.load_scan_from_bag(start_idx)
-        scan1 = self.load_scan_from_bag(end_idx - 1)
+        scan1 = self.load_scan_from_bag(end_idx)
 
         return {
             "scan0": scan0,
@@ -257,14 +296,15 @@ class RosbagSeqDataset(Dataset):
             "imu_ts": imu_ts,
             "accels": accels,
             "gyros": gyros,
-            "dts": dts,
+            # "dts": torch.tensor(dt_segment, dtype=torch.float32),
+            # "dts": t_end-t_start,
             "valid_length": torch.tensor(len(imu_ts), dtype=torch.long),
             "gt_pose0": gt_pose0,
             "gt_pose1": gt_pose1,
             "gt_velocity": gt_velocity,
             "imu_dts": torch.tensor(dt_segment, dtype=torch.float32),
             "scan0_ts": torch.tensor(t_start, dtype=torch.float32),
-            "scan1_ts": torch.tensor(self.lidar_timestamps[end_idx - 1], dtype=torch.float32),
+            "scan1_ts": torch.tensor(t_end, dtype=torch.float32),
         }
 
     def check_topic(self, topic: str) -> str:
