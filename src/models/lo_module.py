@@ -10,16 +10,15 @@ from scipy.spatial.transform import Rotation
 from concurrent.futures import ThreadPoolExecutor
 
 ## ======= G-ICP ==========================
-from utils.point_module import *
+# from utils.point_module import *
 ## ========================================
 
 ## ======= Fast GICP =====================
-import pygicp
+# import pygicp
 ## =======================================
 
 ## ======= KISS GICP =====================
-from kiss_icp.config import KISSConfig
-from kiss_icp.deskew import get_motion_compensator
+from kiss_icp.config import KISSConfig, load_config
 from kiss_icp.mapping import get_voxel_hash_map
 from kiss_icp.preprocess import get_preprocessor
 from kiss_icp.registration import get_registration
@@ -28,12 +27,23 @@ from kiss_icp.voxelization import voxel_down_sample
 ## =======================================
 
 ## ======= Small GICP =====================
-import small_gicp
+# import small_gicp
 ## =======================================
 
 
-from utils.overlap_score import calc_symmetric_overlap
+from scipy.spatial import cKDTree
 
+def calc_symmetric_overlap(cloud1, cloud2, dis_threshold=0.3):
+    tree2 = cKDTree(cloud2)
+    dists1, _ = tree2.query(cloud1, k=1)
+    match_num = np.sum(dists1 < dis_threshold)
+
+    tree1 = cKDTree(cloud1)
+    dists2, _ = tree1.query(cloud2, k=1)
+    match_num += np.sum(dists2 < dis_threshold)
+
+    overlap = match_num / (cloud1.shape[0] + cloud2.shape[0])
+    return min(overlap, 1.0)
 
 # ------------------------
 # Helpers
@@ -150,38 +160,56 @@ class Small_GICP:
 class KISS_ICP:
     def __init__(self, last_pose):
         self.config = KISSConfig()
-        self.compensator = get_motion_compensator(self.config)
+
+        self.config = load_config("/home/vr/work/kiss-icp/config/basic.yaml", max_range=100)
+
+        self.last_pose = np.eye(4)
+        self.last_delta = np.eye(4)
         self.adaptive_threshold = get_threshold_estimator(self.config)
+        self.preprocessor = get_preprocessor(self.config)
         self.registration = get_registration(self.config)
         self.local_map = get_voxel_hash_map(self.config)
-        self.preprocess = get_preprocessor(self.config)
-        self.last_pose = pose7_to_mat44(last_pose).astype(np.float64)
-        self.last_delta = np.eye(4, dtype=np.float64)
 
-    def voxelize(self, iframe, config):
-        frame_downsample = voxel_down_sample(iframe, config.mapping.voxel_size * 0.5)
-        source = voxel_down_sample(frame_downsample, config.mapping.voxel_size * 1.5)
-        return source, frame_downsample
+    def get_motion(self, frame, timestamps):
+        # Apply motion compensation
+        frame = self.preprocessor.preprocess(frame, timestamps, self.last_delta)
+        # Voxelize
+        source, frame_downsample = self.voxelize(frame)
 
-    def get_motion(self, curr_scan, curr_ts):
-        scan = self.compensator.deskew_scan(curr_scan, curr_ts, self.last_delta)
-        scan = self.preprocess(scan)
-        source, scan_down = self.voxelize(scan, self.config)
+        # Get adaptive_threshold
         sigma = self.adaptive_threshold.get_threshold()
+
+        # Compute initial_guess for ICP
         initial_guess = self.last_pose @ self.last_delta
+
+        # Run ICP
         new_pose = self.registration.align_points_to_map(
-            points=source, voxel_map=self.local_map, initial_guess=initial_guess,
-            max_correspondance_distance=3*sigma, kernel=sigma/3
+            points=source,
+            voxel_map=self.local_map,
+            initial_guess=initial_guess,
+            max_correspondance_distance=3 * sigma,
+            kernel=sigma,
         )
-        model_dev = np.linalg.inv(initial_guess) @ new_pose
-        self.adaptive_threshold.update_model_deviation(model_dev)
-        self.local_map.remove_far_away_points(new_pose[:3, 3])
-        self.local_map.update(scan_down, new_pose)
+
+        # Compute the difference between the prediction and the actual estimate
+        model_deviation = np.linalg.inv(initial_guess) @ new_pose
+
+        # Update step: threshold, local map, delta, and the last pose
+        self.adaptive_threshold.update_model_deviation(model_deviation)
+        self.local_map.update(frame_downsample, new_pose)
         self.last_delta = np.linalg.inv(self.last_pose) @ new_pose
         self.last_pose = new_pose
+
+        # Return the (deskew) input raw scan (frame) and the points used for registration (source)
+
         T_ICP_Global = new_pose.astype(np.float64)
         T_ICP_Relative = self.last_delta.astype(np.float64)
         return T_ICP_Global, T_ICP_Relative
+
+    def voxelize(self, iframe):
+        frame_downsample = voxel_down_sample(iframe, self.config.mapping.voxel_size * 0.5)
+        source = voxel_down_sample(frame_downsample, self.config.mapping.voxel_size * 1.5)
+        return source, frame_downsample
 
 
 # ------------------------
@@ -232,14 +260,7 @@ class LOModule(nn.Module):
         self.submap_max_points = int(submap_max_points)
         self.submap_pts = None
 
-        if lo_model == 'g_icp':
-            self.model = G_ICP()
-        elif lo_model == 'fast_gicp':
-            self.model = Fast_GICP()
-        elif lo_model == 'small_gicp':
-            self.model = Small_GICP()
-        elif lo_model == 'kiss_icp':
-            self.model = KISS_ICP(init_state)
+        self.model = KISS_ICP(init_state)
 
     def reset_submap(self):
         self.submap_pts = None
@@ -363,26 +384,34 @@ class LOModule(nn.Module):
                 rel_mats = []
                 global_mats = [curr_glb_mat.copy()]
 
-                if last_state is not None:
-                    if isinstance(last_state, pp.LieTensor):
-                        curr_glb_mat = last_state.matrix().cpu().numpy().astype(np.float64)
-                    elif isinstance(last_state, torch.Tensor) and last_state.shape == (7,):
-                        curr_glb_mat = pp.SE3(last_state.unsqueeze(0)).matrix().cpu().numpy().astype(np.float64)
-                else:
-                    curr_glb_mat = np.eye(4, dtype=np.float64)
+                # if last_state is not None:
+                #     if isinstance(last_state, pp.LieTensor):
+                #         curr_glb_mat = last_state.matrix().cpu().numpy().astype(np.float64)
+                #     elif isinstance(last_state, torch.Tensor) and last_state.shape == (7,):
+                #         curr_glb_mat = pp.SE3(last_state.unsqueeze(0)).matrix().cpu().numpy().astype(np.float64)
+                # else:
+                #     curr_glb_mat = np.eye(4, dtype=np.float64)
 
                 for idx in range(B):
                     curr = scans1[idx].cpu().numpy()
                     prev = scans0[idx].cpu().numpy()
+                    ts1 = curr[:, -1]
+                    ts0 = prev[:, -1]
+                    curr = curr[:, :3]
+                    prev = prev[:, :3]
                     curr = remove_nan_inf(curr)
                     prev = remove_nan_inf(prev)
                     curr_trans = self.transformScan(curr)
                     prev_trans = self.transformScan(prev)
                     curr_down = curr_trans[::2]
                     prev_down = prev_trans[::2]
+
                     T_ICP_Global, T_ICP_Relative = self.model.get_motion(
-                        curr_trans, sample['scan1_ts'][idx].cpu().numpy()
+                        curr_trans, ts1
                     )
+
+
+
                     T_ICP_Global = T_ICP_Global.astype(np.float64)
                     T_ICP_Relative = T_ICP_Relative.astype(np.float64)
                     motions_mat[idx] = T_ICP_Relative

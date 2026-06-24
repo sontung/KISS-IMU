@@ -31,7 +31,7 @@ class IMUIntegrator:
         self.device = device
         init_pos, init_rot, init_vel, _ = prase_init(init_state, motion_mode=False)
         self.integrator = pp.module.IMUPreintegrator(init_pos, init_rot, init_vel,
-                                                     prop_cov=prop_cov, reset=True, gravity=gravity).to(device)
+                                                     prop_cov=prop_cov, reset=True, gravity=gravity[-1]).to(device)
     
     def integrate(self, init, dts, accels, gyros, cov_accels=None, cov_gyros=None, motion_mode=False, device='cuda:0'):
         init_pos, init_rot, init_vel, init_cov = prase_init(init, motion_mode, device)

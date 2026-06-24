@@ -69,7 +69,7 @@ class SeqDataset(Data.Dataset):
             self.imu_window_size = 55
             
         elif self.data_type == 'diter_os':
-            self.lidar_dtype = [('x', np.float64),('y',np.float64),('z',np.float64),('intensity',np.float64)]
+            self.lidar_dtype = [('x', np.float64),('y',np.float64),('z',np.float64),('intensity',np.float64),("timestamp",np.float64)]
             self.acc_idx = 4; self.gyr_idx = 1
             self.T_I_L = np.zeros(3)
             self.R_I_L = np.eye(3)
@@ -87,7 +87,7 @@ class SeqDataset(Data.Dataset):
             self.imu_window_size = 15
             
         elif self.data_type == 'kimera':
-            self.lidar_dtype = [('x', np.float64),('y',np.float64),('z',np.float64),('intensity',np.float64)]
+            self.lidar_dtype = [('x', np.float64),('y',np.float64),('z',np.float64),('intensity',np.float64),("timestamp",np.float64)]
             self.acc_idx = 4; self.gyr_idx = 1
             self.T_I_L = np.zeros(3)
             self.R_I_L = np.array([[ 0, 1, 0],
@@ -166,7 +166,7 @@ class SeqDataset(Data.Dataset):
             scan_ts = scan_ts[:n]
 
         return scan_files, scan_ts
-    
+
     def load_gt(self, data_root):
         data_path = os.path.join(data_root, 'gt_pose.csv')
         gt_data = pd.read_csv(data_path, header=None)
@@ -254,7 +254,7 @@ class SeqDataset(Data.Dataset):
         self.scan_ts = filtered_scan_ts
         
     def scan_vstack(self, scan):
-        return np.vstack((scan['x'], scan['y'], scan['z'])).T
+        return np.vstack((scan['x'], scan['y'], scan['z'], scan["timestamp"])).T
     
     def __getitem__(self, index):
         result = self.get_pair(self.links[index][0], self.links[index][1])
