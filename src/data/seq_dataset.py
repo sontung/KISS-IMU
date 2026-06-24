@@ -70,7 +70,7 @@ class SeqDataset(Data.Dataset):
             
         elif self.data_type == 'diter_os':
             self.lidar_dtype = [('x', np.float64),('y',np.float64),('z',np.float64),('intensity',np.float64),("timestamp",np.float64)]
-            self.acc_idx = 4; self.gyr_idx = 1
+            self.acc_idx = 1; self.gyr_idx = 4
             self.T_I_L = np.zeros(3)
             self.R_I_L = np.eye(3)
             self.T_I_G = np.zeros(3)
