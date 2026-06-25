@@ -170,11 +170,14 @@ class SeqDataset(Data.Dataset):
     def load_gt(self, data_root):
         data_path = os.path.join(data_root, 'gt_pose.csv')
         gt_data = pd.read_csv(data_path, header=None)
-
-        gt_ts = gt_data.iloc[:, 0].to_numpy(dtype=np.float64)
-        pose_vals = gt_data.iloc[:, 1:].to_numpy(dtype=np.float64)
+        try:
+            gt_ts = gt_data.iloc[:, 0].to_numpy(dtype=np.float64)
+            pose_vals = gt_data.iloc[:, 1:].to_numpy(dtype=np.float64)
+        except ValueError:
+            gt_data = np.loadtxt(data_path)
+            gt_ts = gt_data[:, 0]
+            pose_vals = gt_data[:, 1:]
         num_poses, D = pose_vals.shape
-
         gt_poses = np.zeros((num_poses, 1, 7), dtype=np.float64)
 
         if D == 7:

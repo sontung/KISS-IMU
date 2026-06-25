@@ -110,6 +110,7 @@ def train(lo_model, network, loader, optimizer, integrator, data_seq, epoch_i, g
         gt_poses_list = []
         
     max_iterations = int(len(loader) * args.train_ratio)
+    # max_iterations = 5
     for i, sample in enumerate(tqdm.tqdm(loader, total=max_iterations)):
         if i >= max_iterations:
             break
@@ -499,8 +500,8 @@ def validate(data_loader, network, integrator, data_seq, epoch_i):
     sum_last_ape = 0.0
     n_windows = 0
 
-    pred_last_list = []
-    gt_last_list = []
+    pred_traj = []   # <-- collect predicted xyz
+    gt_traj   = []   # <-- collect GT xyz
 
     for sample in tqdm.tqdm(data_loader):
         init_pos = sample['gt_pose0'][0][:3].clone().to(device).float()
@@ -510,22 +511,23 @@ def validate(data_loader, network, integrator, data_seq, epoch_i):
         init_state = {'rot': pp.SO3(init_rot), 'vel': init_vel, 'pos': init_pos, 'cov': None}
 
         corr_data = network(sample)
-        out_state = integrator.integrate(init=init_state,
-                                         dts=corr_data['dts'], accels=corr_data['accels_corr'], gyros=corr_data['gyros_corr'],
-                                         cov_accels=corr_data['acc_cov'], cov_gyros=corr_data['gyr_cov'],
-                                         motion_mode=False)
- 
+        out_state = integrator.integrate(
+            init=init_state,
+            dts=corr_data['dts'], accels=corr_data['accels_corr'], gyros=corr_data['gyros_corr'],
+            cov_accels=corr_data['acc_cov'], cov_gyros=corr_data['gyr_cov'],
+            motion_mode=False
+        )
+
         pred_last_se3 = pp.SE3(torch.cat([out_state['pos'], out_state['rot'].tensor()], dim=-1)).to(device)
 
-        gt0 = sample['gt_pose0'][0].to(device).float()
+        gt0    = sample['gt_pose0'][0].to(device).float()
         gt_seq = sample['gt_pose1'].to(device).float()
         if gt_seq.ndim == 3:
             gt_seq = gt_seq[0]
         gt_last = gt_seq[-1]
 
-        q0 = gt0[3:]
-        qT = gt_last[3:]
-        GT0 = pp.SE3(torch.cat([gt0[:3], q0], dim=-1)).to(device)
+        q0 = gt0[3:];  qT = gt_last[3:]
+        GT0 = pp.SE3(torch.cat([gt0[:3],     q0], dim=-1)).to(device)
         GTT = pp.SE3(torch.cat([gt_last[:3], qT], dim=-1)).to(device)
 
         dP = GT0.Inv() * pred_last_se3
@@ -533,7 +535,7 @@ def validate(data_loader, network, integrator, data_seq, epoch_i):
         E  = dP.Inv() * dQ
 
         trans_err   = E.translation().norm().item()
-        rot_err_deg = (E.rotation().Log().norm().item() * 180.0 / np.pi)
+        rot_err_deg = E.rotation().Log().norm().item() * 180.0 / np.pi
         ape_last    = (pred_last_se3.translation() - GTT.translation()).norm().item()
 
         sum_ep_rpe_trans   += trans_err
@@ -541,8 +543,15 @@ def validate(data_loader, network, integrator, data_seq, epoch_i):
         sum_last_ape       += ape_last
         n_windows          += 1
 
-        pred_last_list.append(as_xyz1d(pred_last_se3.translation()))
-        gt_last_list.append(as_xyz1d(GTT.translation()))
+        # print(f"[DBG] out_state pos shape: {out_state['pos'].shape}")
+        # print(f"[DBG] pred_last_se3 translation: {pred_last_se3.translation()}")
+        # print(f"[DBG] GTT translation: {GTT.translation()}")
+        #
+        # pred_traj.append(as_xyz1d(pred_last_se3.translation()))
+        # gt_traj.append(as_xyz1d(GTT.translation()))
+
+        pred_traj.append(as_xyz1d(pred_last_se3.translation()))  # <--
+        gt_traj.append(as_xyz1d(GTT.translation()))               # <--
 
     if n_windows > 0:
         mean_ep_rpe_trans = sum_ep_rpe_trans / n_windows
@@ -552,11 +561,11 @@ def validate(data_loader, network, integrator, data_seq, epoch_i):
         mean_ep_rpe_trans = mean_ep_rpe_rot = mean_last_ape = float('inf')
 
     print("====================================================")
-    print(f"[Summary] RTE in {data_seq} at epoch {epoch_i}: {mean_ep_rpe_trans:.3f} m, ")
+    print(f"[Summary] RTE in {data_seq} at epoch {epoch_i}: {mean_ep_rpe_trans:.3f} m")
     print(f"[Summary] RRE in {data_seq} at epoch {epoch_i}: {mean_ep_rpe_rot:.3f} deg")
     print("====================================================")
-    return mean_ep_rpe_trans+mean_ep_rpe_rot
 
+    return mean_ep_rpe_trans + mean_ep_rpe_rot, pred_traj, gt_traj   # <-- return trajs
 
 def init_list(dataset):
     global init_state, dataiter
@@ -594,7 +603,8 @@ def init_list(dataset):
     gt_poses_list = []
 
 
-def plot_pose_trajs(icp_poses, pgo_poses, label_poses, gt_poses, filename, data_seq, epoch_i, train_set=False):
+def plot_pose_trajs(icp_poses, pgo_poses, label_poses, gt_poses,
+                    filename, data_seq, epoch_i, train_set=False):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -1087,23 +1097,23 @@ if __name__ == "__main__":
             integrator = IMUIntegrator(init_state=valid_dataset.init, device=args.device)
 
             gravity = valid_dataset.gravity
-            valid_loss = validate(data_loader=valid_loader, network=network, integrator=integrator, data_seq=valid_seq, epoch_i=epoch_i)
+            valid_loss, pred_traj, gt_traj = validate(  # <-- unpack
+                data_loader=valid_loader, network=network,
+                integrator=integrator, data_seq=valid_seq, epoch_i=epoch_i
+            )
 
             epoch_valid_loss += valid_loss
             print(f"  * Valid Loss: {valid_loss} *   ")
             ckpt_dir = save_ckpt(network=network, optimizer=optimizer, epoch_i=epoch_i,
                                  data_seq=valid_seq, save_best=False, valid_set=True)
-            icp_pose = np.stack([t.detach().cpu() for t in icp_poses_list])
-            pgo_pose = np.stack([t.detach().cpu() for t in pgo_poses_list])
-            gt_pose  = np.stack([t.detach().cpu() for t in gt_poses_list]) if gt_poses_list else np.array([])
-            plot_pose_trajs(icp_pose, pgo_pose, None, gt_pose,
-                            os.path.join(ckpt_dir, f"{epoch_i:04d}.png"),
-                            data_seq=valid_seq, epoch_i=epoch_i, train_set=False)
-
-            if len(gt_poses_list) > 1:
-                gt_poses_np  = np.stack([t.detach().cpu().numpy() for t in gt_poses_list])
-                pgo_poses_np = np.stack([t.detach().cpu().numpy() for t in pgo_poses_list])
-                icp_poses_np = np.stack([t.detach().cpu().numpy() for t in icp_poses_list])
+            # Pass pred and gt directly — no more stacking dead global lists
+            pred_np = np.array(pred_traj) if pred_traj else np.array([])
+            gt_np = np.array(gt_traj) if gt_traj else np.array([])
+            plot_pose_trajs(
+                icp_poses=None, pgo_poses=pred_np, label_poses=None, gt_poses=gt_np,
+                filename=os.path.join(ckpt_dir, f"{epoch_i:04d}.png"),
+                data_seq=valid_seq, epoch_i=epoch_i, train_set=False
+            )
 
         print(f"  * Total Valid Loss in {epoch_i} epoch: {epoch_valid_loss / len(args.valid_seqs)} *   ")
 

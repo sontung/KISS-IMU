@@ -11,11 +11,11 @@ from kiss_icp.tools.point_cloud2 import read_point_cloud
 # ==========================================
 # CONFIGURATION: Change these to match your bag
 # ==========================================
-# BAG_DIR = "/home/vr/work/datasets/VINUNI/first_run"  # Path to the folder containing metadata.yaml
-# OUTPUT_ROOT = "/home/vr/work/datasets/VINUNI/first_run/MyCustomData"
+BAG_DIR = "/home/vr/work/datasets/VINUNI/first_run"  # Path to the folder containing metadata.yaml
+OUTPUT_ROOT = "/home/vr/work/datasets/VINUNI/first_run/MyCustomData"
 
-BAG_DIR = "/home/vr/work/datasets/VINUNI/second_run"  # Path to the folder containing metadata.yaml
-OUTPUT_ROOT = "/home/vr/work/datasets/VINUNI/second_run/MyCustomData"
+# BAG_DIR = "/home/vr/work/datasets/VINUNI/second_run"  # Path to the folder containing metadata.yaml
+# OUTPUT_ROOT = "/home/vr/work/datasets/VINUNI/second_run/MyCustomData"
 
 SEQUENCE_NAME = ""
 
@@ -57,9 +57,9 @@ with Reader(BAG_DIR) as reader:
 
             imu_records.append([
                 msg_time,
-                msg.linear_acceleration.x,
-                msg.linear_acceleration.y,
-                msg.linear_acceleration.z,
+                msg.linear_acceleration.x*9.81,
+                msg.linear_acceleration.y*9.81,
+                msg.linear_acceleration.z*9.81,
                 msg.angular_velocity.x,
                 msg.angular_velocity.y,
                 msg.angular_velocity.z
